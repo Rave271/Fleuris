@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta
+import base64
+import io
 import logging
 import os
 import secrets
@@ -6,6 +8,7 @@ import sqlite3
 
 from flask import Flask, abort, g, redirect, render_template, request, session, url_for
 import pyotp
+import qrcode
 from werkzeug.security import check_password_hash, generate_password_hash
 
 
@@ -404,7 +407,18 @@ def mfa_setup():
         db.execute("UPDATE users SET totp_secret=? WHERE id=?", (secret, user_record["id"]))
         db.commit()
         log_event("MFA_ENABLED", "MFA secret generated", user_record["id"])
-    return render_template("mfa_setup.html", secret=secret, user=user_record)
+    qr_data = None
+    if secret:
+        totp = pyotp.TOTP(secret)
+        provisioning_uri = totp.provisioning_uri(
+            name=user_record["username"],
+            issuer_name="Fleuris Vault Bank",
+        )
+        qr_image = qrcode.make(provisioning_uri)
+        buffer = io.BytesIO()
+        qr_image.save(buffer, format="PNG")
+        qr_data = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return render_template("mfa_setup.html", secret=secret, user=user_record, qr_data=qr_data)
 
 
 @app.route("/logout")
