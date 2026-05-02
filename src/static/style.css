@@ -446,7 +446,7 @@ th {
 .demo-grid {
     display: grid;
     gap: 18px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
 }
 
 .demo-card {
@@ -457,6 +457,7 @@ th {
     display: grid;
     gap: 16px;
     padding: 22px;
+    grid-column: 1 / -1;
 }
 
 .demo-card.compact {
@@ -573,12 +574,26 @@ code {
 }
 
 .mini-row {
-    grid-template-columns: 1fr 1.4fr auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2.2fr) auto;
 }
 
 .mini-row small {
     color: var(--muted);
     display: block;
+}
+
+.mini-row code {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+}
+
+.mini-row strong {
+    text-align: right;
+    white-space: nowrap;
 }
 
 .scenario-item {
