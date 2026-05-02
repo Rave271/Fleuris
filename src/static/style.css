@@ -459,6 +459,16 @@ th {
     padding: 22px;
 }
 
+.demo-card.compact {
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.demo-card.compact .demo-card-title,
+.demo-card.compact .result {
+    grid-column: 1 / -1;
+}
+
 .wide-card {
     grid-column: 1 / -1;
     overflow-x: auto;
@@ -497,6 +507,17 @@ th {
 .evidence-block {
     display: grid;
     gap: 6px;
+}
+
+.demo-card.compact .evidence-block {
+    align-items: center;
+    display: grid;
+    gap: 6px 12px;
+    grid-template-columns: 140px minmax(0, 1fr);
+}
+
+.demo-card.compact .evidence-block code {
+    width: 100%;
 }
 
 .evidence-block span {
@@ -591,6 +612,14 @@ code {
     .demo-grid,
     .mini-row,
     .scenario-item {
+        grid-template-columns: 1fr;
+    }
+
+    .demo-card.compact .evidence-block {
+        grid-template-columns: 1fr;
+    }
+
+    .demo-card.compact {
         grid-template-columns: 1fr;
     }
 

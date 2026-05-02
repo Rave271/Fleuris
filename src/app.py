@@ -40,6 +40,7 @@ TEAM_DEMO_NOTES = [
     "Access denied events are recorded for admin review.",
 ]
 
+# Security logging to file + DB for audit review.
 logging.basicConfig(
     filename=SECURITY_LOG,
     level=logging.INFO,
@@ -64,6 +65,7 @@ def close_connection(exception):
 
 @app.after_request
 def add_security_headers(response):
+    # Security headers: CSP, clickjacking, MIME sniffing, referrer policy.
     for header, value in SECURITY_HEADERS.items():
         response.headers[header] = value
     return response
@@ -80,6 +82,7 @@ def ensure_column(table, column, definition):
 
 
 def log_event(event_type, detail, user_id=None):
+    # Audit logging to file + database.
     logging.info("%s user=%s ip=%s %s", event_type, user_id, request.remote_addr, detail)
     get_db().execute(
         "INSERT INTO security_events (event_type, user_id, ip_address, detail) VALUES (?, ?, ?, ?)",
@@ -150,6 +153,7 @@ def init_db():
             ("raghav", "Admin@123", 2500.0, "admin"),
         ]
         for username, password, balance, role in seed_users:
+            # Password hashing: no plaintext storage.
             cursor.execute(
                 """INSERT OR IGNORE INTO users
                    (username, password_hash, balance, role)
@@ -187,6 +191,7 @@ def login_required():
 
 
 def require_csrf_token():
+    # CSRF defense: session-bound token required for state-changing actions.
     token = request.form.get("csrf_token")
     if not token or token != session.get("csrf_token"):
         log_event("CSRF_BLOCKED", "Invalid or missing CSRF token", session.get("user_id"))
@@ -316,11 +321,13 @@ def login():
         password = request.form.get("password", "")
         db = get_db()
         user = db.execute(
+            # SQL injection defense: parameterized query.
             "SELECT * FROM users WHERE username=?",
             (username,),
         ).fetchone()
 
         if user and user["locked_until"]:
+            # Brute-force defense: temporary account lockout.
             locked_until = datetime.fromisoformat(user["locked_until"])
             if locked_until > datetime.utcnow():
                 log_event("LOGIN_LOCKED", f"Locked account login attempt for {username}", user["id"])
@@ -485,11 +492,13 @@ def statement(user_id=None):
     if not user:
         return redirect(url_for("login"))
     if user["role"] == "admin" and user_id is None:
+        # Access control: admins cannot view their own statements.
         log_event("ACCESS_DENIED", "Admin attempted to open personal statement", user["id"])
         abort(403)
 
     requested_user_id = user_id or user["id"]
     if requested_user_id != user["id"] and user["role"] != "admin":
+        # Access control: customers cannot view other customers' statements.
         log_event("ACCESS_DENIED", f"Statement access denied for user {requested_user_id}", user["id"])
         abort(403)
 
