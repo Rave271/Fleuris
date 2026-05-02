@@ -394,13 +394,17 @@ def mfa_setup():
         return redirect(url_for("login"))
 
     db = get_db()
-    secret = user["totp_secret"]
+    user_record = db.execute(
+        "SELECT id, username, role, totp_secret FROM users WHERE id=?",
+        (user["id"],),
+    ).fetchone()
+    secret = user_record["totp_secret"]
     if request.method == "POST":
         secret = pyotp.random_base32()
-        db.execute("UPDATE users SET totp_secret=? WHERE id=?", (secret, user["id"]))
+        db.execute("UPDATE users SET totp_secret=? WHERE id=?", (secret, user_record["id"]))
         db.commit()
-        log_event("MFA_ENABLED", "MFA secret generated", user["id"])
-    return render_template("mfa_setup.html", secret=secret, user=user)
+        log_event("MFA_ENABLED", "MFA secret generated", user_record["id"])
+    return render_template("mfa_setup.html", secret=secret, user=user_record)
 
 
 @app.route("/logout")
