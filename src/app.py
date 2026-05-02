@@ -5,6 +5,7 @@ import secrets
 import sqlite3
 
 from flask import Flask, abort, g, redirect, render_template, request, session, url_for
+import pyotp
 from werkzeug.security import check_password_hash, generate_password_hash
 
 
@@ -121,6 +122,7 @@ def init_db():
         ensure_column("users", "role", "TEXT DEFAULT 'customer'")
         ensure_column("users", "failed_login_count", "INTEGER DEFAULT 0")
         ensure_column("users", "locked_until", "TEXT")
+        ensure_column("users", "totp_secret", "TEXT")
 
         cursor.execute(
             """CREATE TABLE IF NOT EXISTS transactions (
@@ -315,10 +317,23 @@ def login():
     if current_user():
         return redirect(url_for("dashboard"))
 
+    def record_failed_login(user, username, event_type, detail):
+        failed_count = user["failed_login_count"] + 1
+        locked_until = None
+        if failed_count >= MAX_LOGIN_ATTEMPTS:
+            locked_until = (datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)).isoformat()
+        db.execute(
+            "UPDATE users SET failed_login_count=?, locked_until=? WHERE id=?",
+            (failed_count, locked_until, user["id"]),
+        )
+        db.commit()
+        log_event(event_type, detail, user["id"])
+
     error = None
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
+        mfa_code = request.form.get("mfa_code", "").strip()
         db = get_db()
         user = db.execute(
             # SQL injection defense: parameterized query.
@@ -334,6 +349,17 @@ def login():
                 return render_template("login.html", error="Account is temporarily locked. Try again later.")
 
         if user and check_password_hash(user["password_hash"], password):
+            if user["totp_secret"]:
+                totp = pyotp.TOTP(user["totp_secret"])
+                if not totp.verify(mfa_code, valid_window=1):
+                    record_failed_login(
+                        user,
+                        username,
+                        "MFA_FAILED",
+                        f"Invalid MFA code for {username}",
+                    )
+                    error = "Invalid MFA code."
+                    return render_template("login.html", error=error)
             session.clear()
             session.permanent = True
             session["user_id"] = user["id"]
@@ -347,22 +373,34 @@ def login():
             return redirect(url_for("dashboard"))
 
         if user:
-            failed_count = user["failed_login_count"] + 1
-            locked_until = None
-            if failed_count >= MAX_LOGIN_ATTEMPTS:
-                locked_until = (datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)).isoformat()
-            db.execute(
-                "UPDATE users SET failed_login_count=?, locked_until=? WHERE id=?",
-                (failed_count, locked_until, user["id"]),
+            record_failed_login(
+                user,
+                username,
+                "LOGIN_FAILED",
+                f"Failed login for {username}",
             )
-            db.commit()
-            log_event("LOGIN_FAILED", f"Failed login for {username}", user["id"])
         else:
             log_event("LOGIN_FAILED", f"Unknown username {username}")
 
         error = "Invalid username or password."
 
     return render_template("login.html", error=error)
+
+
+@app.route("/mfa-setup", methods=["GET", "POST"])
+def mfa_setup():
+    user = login_required()
+    if not user:
+        return redirect(url_for("login"))
+
+    db = get_db()
+    secret = user["totp_secret"]
+    if request.method == "POST":
+        secret = pyotp.random_base32()
+        db.execute("UPDATE users SET totp_secret=? WHERE id=?", (secret, user["id"]))
+        db.commit()
+        log_event("MFA_ENABLED", "MFA secret generated", user["id"])
+    return render_template("mfa_setup.html", secret=secret, user=user)
 
 
 @app.route("/logout")

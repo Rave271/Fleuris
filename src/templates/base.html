@@ -20,6 +20,7 @@
                     <a href="{{ url_for('statement') }}">Statement</a>
                 {% endif %}
                 <a href="{{ url_for('security_demo') }}">Demo Lab</a>
+                <a href="{{ url_for('mfa_setup') }}">MFA Setup</a>
                 {% if current_user["role"] == "admin" %}
                     <a href="{{ url_for('users') }}">Customers</a>
                     <a href="{{ url_for('security_center') }}">Security</a>

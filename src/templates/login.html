@@ -24,6 +24,9 @@
         <label for="password">Password</label>
         <input type="password" id="password" name="password" autocomplete="current-password" required>
 
+        <label for="mfa_code">MFA code (if enabled)</label>
+        <input type="text" id="mfa_code" name="mfa_code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*">
+
         <button type="submit">Login</button>
 
         {% if error %}
