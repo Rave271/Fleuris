@@ -30,7 +30,7 @@
         {% if qr_data %}
             <div class="credential-box">
                 <strong>Scan this QR code</strong>
-                <img src="data:image/png;base64,{{ qr_data }}" alt="MFA QR code">
+                <img src="data:image/svg+xml;base64,{{ qr_data }}" alt="MFA QR code">
             </div>
         {% endif %}
     {% endif %}

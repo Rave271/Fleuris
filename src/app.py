@@ -9,6 +9,7 @@ import sqlite3
 from flask import Flask, abort, g, redirect, render_template, request, session, url_for
 import pyotp
 import qrcode
+from qrcode.image.svg import SvgImage
 from werkzeug.security import check_password_hash, generate_password_hash
 
 
@@ -414,9 +415,9 @@ def mfa_setup():
             name=user_record["username"],
             issuer_name="Fleuris Vault Bank",
         )
-        qr_image = qrcode.make(provisioning_uri)
+        qr_image = qrcode.make(provisioning_uri, image_factory=SvgImage)
         buffer = io.BytesIO()
-        qr_image.save(buffer, format="PNG")
+        qr_image.save(buffer)
         qr_data = base64.b64encode(buffer.getvalue()).decode("ascii")
     return render_template("mfa_setup.html", secret=secret, user=user_record, qr_data=qr_data)
 
